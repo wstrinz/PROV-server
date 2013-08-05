@@ -1,7 +1,29 @@
 require 'sinatra'
 require 'bio-publisci'
 require 'htmlentities'
-include PubliSci::Prov::DSL
+require 'coffee-script'
+require "haml-more"
+
+helpers do
+  def input_txt
+    <<-EOF
+entity :triplified_example
+
+agent :publisci, subject: 'http://gsocsemantic.wordpress.com/publisci', type: "software"
+
+activity :triplify do
+  generated :triplified_example
+  associated_with :publisci
+end
+    EOF
+  end
+
+  def repos
+    @@repos ||= {}
+  end
+end
+
+enable :sessions
 
 get '/test' do
   stream do |out|
@@ -14,44 +36,38 @@ get '/test' do
 end
 
 get '/' do
-  agent :publisci, subject: 'http://gsocsemantic.wordpress.com/publisci', type: "software"
-  agent :R, subject: "http://r-project.org"
-  agent :sciruby, subject: "http://sciruby.com", type: "organization"
-
-  plan :R_steps, subject: "http://example.org/plan/R_steps", steps: "spec/resource/example.Rhistory"
-
-  agent :Will do
-    subject "http://gsocsemantic.wordpress.com/me"
-    type "person"
-    name "Will Strinz"
-    on_behalf_of "http://sciruby.com"
+  if session[:turtle]
+    redirect to('/viewit')
+  else
+    redirect to('/input')
   end
+end
 
-  entity :triplified_example, subject: "http://example.org/dataset/ex", generated_by: :triplify
+get '/input' do
+  haml :input
+end
 
-  entity :original do
-    generated_by :use_R
-    subject "http://example.org/R/ex"
-    source "./example.RData"
-
-    has "http://purl.org/dc/terms/title", "original data object"
-  end
-
-  activity :triplify do
-    subject "http://example.org/activity/triplify"
-    generated "http://example.org/dataset/ex"
-    associated_with :publisci
-    used :original
-  end
-
-  activity :use_R do
-    subject "http://example.org/activity/use_R"
-    generated "http://example.org/R/ex"
-
-    associated_with :R
-    associated_with :Will
-  end
-
+post '/input' do
+  ev = PubliSci::Prov::DSL::Singleton.new
+  ev.instance_eval(params[:input])
+  session[:turtle] = ev.instance_eval 'generate_n3'
   coder = HTMLEntities.new
-  coder.encode(generate_n3).gsub("\n","<br>").gsub("\t","&nbsp;&nbsp;")
+  session[:turtle] = coder.encode(session[:turtle]).gsub("\n","<br>").gsub("\t","&nbsp;&nbsp;")
+  session[:repo_key] = Time.now.nsec
+  repos[session[:repo_key]] = ev.instance_eval 'to_repository'
+  redirect to('/viewit')
+end
+
+get '/viewit' do
+  if session[:repo_key]
+    @repo = repos[session[:repo_key]]
+    @ttl = session[:turtle]
+    haml :view_repo
+  else
+    redirect to('/')
+  end
+end
+
+get '/script.js' do
+  coffee :script
 end
