@@ -1,9 +1,7 @@
 %div
-  %script(src='script.js')
+  / %script(src='script.js')
   %p Provenance generator
 
 %form{ action: "", method: "post"}
   %textarea{name: "input", :class => "text", cols: "80", rows: "20"}=input_txt
   %input{:type => "submit", :value => "Send", :class => "button"}
-
-%div{id: "message"}

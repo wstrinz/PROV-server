@@ -1,6 +1,19 @@
+%table{border: "1"}
+  %tbody
+    %tr
+      %td
+        %a{:href => "query"} Query
+      %td
+        %a{:href => "input"} New
+
 %div
   %p Repo
   %p=@repo
 
   %p Turtle
   %p=@ttl
+  / %td
+  /   %a{:href => "visualize"} Visualize
+
+  / :coffee
+  /   alert 'works'

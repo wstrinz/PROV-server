@@ -1,8 +1,8 @@
 require 'sinatra'
+require "sinatra/reloader" if development?
 require 'bio-publisci'
 require 'htmlentities'
 require 'coffee-script'
-require "haml-more"
 
 helpers do
   def input_txt
@@ -18,12 +18,33 @@ end
     EOF
   end
 
-  def repos
-    @@repos ||= {}
+  def default_query
+    <<-EOS
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+
+SELECT * WHERE{
+  ?s ?p ?o
+} LIMIT 10
+    EOS
   end
+
+  def repos
+    settings.repos
+  end
+
+  def turtles
+    settings.turtles
+  end
+
 end
 
 enable :sessions
+
+configure do
+  set :repos, {}
+  set :turtles, {}
+end
 
 get '/test' do
   stream do |out|
@@ -36,6 +57,8 @@ get '/test' do
 end
 
 get '/' do
+  session.clear unless repos[session[:repo_key]]
+
   if session[:turtle]
     redirect to('/viewit')
   else
@@ -50,22 +73,58 @@ end
 post '/input' do
   ev = PubliSci::Prov::DSL::Singleton.new
   ev.instance_eval(params[:input])
-  session[:turtle] = ev.instance_eval 'generate_n3'
+  session[:turtle_key] = Time.now.nsec
+  turtles[session[:turtle_key]] = ev.instance_eval 'generate_n3'
   coder = HTMLEntities.new
-  session[:turtle] = coder.encode(session[:turtle]).gsub("\n","<br>").gsub("\t","&nbsp;&nbsp;")
+  turtles[session[:turtle_key]] = coder.encode(turtles[session[:turtle_key]]).gsub("\n","<br>").gsub("\t","&nbsp;&nbsp;")
   session[:repo_key] = Time.now.nsec
   repos[session[:repo_key]] = ev.instance_eval 'to_repository'
   redirect to('/viewit')
 end
 
 get '/viewit' do
+  redirect to('/') unless repos[session[:repo_key]]
   if session[:repo_key]
-    @repo = repos[session[:repo_key]]
-    @ttl = session[:turtle]
+    coder = HTMLEntities.new
+    @repo = coder.encode(repos[session[:repo_key]].to_s)
+    @ttl = turtles[session[:turtle_key]]
     haml :view_repo
   else
     redirect to('/')
   end
+end
+
+get '/query' do
+  redirect to('/') unless repos[session[:repo_key]]
+  coder = HTMLEntities.new
+  @repo = coder.encode(repos[session[:repo_key]].to_s)
+  session[:query] ||= default_query
+  @query = session[:query]
+  # @result = session[:query_result]
+  haml :query
+end
+
+post '/query' do
+  # redirect to('/') unless repos[session[:repo_key]]
+  repo = repos[session[:repo_key]]
+  coder = HTMLEntities.new
+  @repo = coder.encode(repo.to_s)
+  @query = params[:query]
+  session[:query] = @query
+  @result = SPARQL.execute(@query, repo)
+  str = '<table border="1">'
+  @result.map{|solution|
+    str << "<tr>"
+    solution.bindings.map{|bind,result|
+      str << "<td>" + coder.encode("#{bind}:  #{result.to_s}") + "</td>"
+    }
+    str << "</tr>"
+  }
+  str << "</table>"
+  @result = str
+  # session[:query_result] = @result
+  # @query = session[:query]
+  haml :query
 end
 
 get '/script.js' do
