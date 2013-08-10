@@ -12,13 +12,15 @@ helpers do
 
   def input_txt
     <<-EOF
-entity :triplified_example
+provenance do
+  entity :triplified_example
 
-agent :publisci, subject: 'http://gsocsemantic.wordpress.com/publisci', type: "software"
+  agent :publisci, subject: 'http://gsocsemantic.wordpress.com/publisci', type: "software"
 
-activity :triplify do
-  generated :triplified_example
-  associated_with :publisci
+  activity :triplify do
+    generated :triplified_example
+    associated_with :publisci
+  end
 end
     EOF
   end
@@ -79,7 +81,7 @@ get '/input' do
 end
 
 post '/input' do
-  ev = PubliSci::Prov::DSL::Singleton.new
+  ev = Class.new{include PubliSci::DSL}.new
   ev.instance_eval(params[:input])
   session[:turtle_key] = Time.now.nsec
   turtles[session[:turtle_key]] = ev.instance_eval 'generate_n3'
