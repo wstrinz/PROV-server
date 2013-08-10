@@ -3,12 +3,13 @@ require "sinatra/reloader" if development?
 require 'bio-publisci'
 require 'htmlentities'
 require 'coffee-script'
-use Rack::Logger
+require 'logger'
+#use Rack::Logger
 
 helpers do
-  def logger
-    request.logger
-  end
+ # def logger
+  #  request.logger
+  #end
 
   def input_txt
     <<-EOF
@@ -53,7 +54,9 @@ configure do
   set :turtles, {}
   file = File.new("log.log", 'a+')
   file.sync = true
-  use Rack::CommonLogger, file
+  set :logger, Logger.new(file)
+  
+  #use Rack::CommonLogger, file
 end
 
 get '/test' do
@@ -89,7 +92,7 @@ post '/input' do
   turtles[session[:turtle_key]] = coder.encode(turtles[session[:turtle_key]]).gsub("\n","<br>").gsub("\t","&nbsp;&nbsp;")
   session[:repo_key] = Time.now.nsec
   repos[session[:repo_key]] = ev.instance_eval 'to_repository'
-  logger.info "new repository #{repos[session[:repo_key]]}, #{Time.now}"
+  settings.logger.info "new repository #{repos[session[:repo_key]]}, #{Time.now}"
   redirect to('/viewit')
 end
 
