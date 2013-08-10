@@ -13,14 +13,30 @@ helpers do
 
   def input_txt
     <<-EOF
+data do
+  object "https://raw.github.com/wstrinz/bioruby-publisci/master/spec/csv/bacon.csv"
+end
+
+metadata do
+  creator "Some Guy"
+end
+
 provenance do
-  entity :triplified_example
+  entity :bacon, subject: "http://www.rqtl.org/ns/dataset/bacon#dataset-bacon"
+  entity :bacon_notes
 
   agent :publisci, subject: 'http://gsocsemantic.wordpress.com/publisci', type: "software"
+  agent :Will, subject: 'http://gsocsemantic.wordpress.com/me', type: "person"
 
   activity :triplify do
-    generated :triplified_example
+    generated :bacon
+    used :bacon_notes
     associated_with :publisci
+  end
+
+  activity :eat_bacon do
+    generated :bacon_notes
+    associated_with :Will
   end
 end
     EOF
@@ -55,7 +71,7 @@ configure do
   file = File.new("log.log", 'a+')
   file.sync = true
   set :logger, Logger.new(file)
-  
+
   #use Rack::CommonLogger, file
 end
 
